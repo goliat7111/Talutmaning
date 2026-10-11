@@ -9,13 +9,10 @@ npm run dev
 
 Öppna adressen som visas i terminalen, vanligtvis http://localhost:5173.
 
-## GitHub
+## Publicera på GitHub Pages
 
-När projektet är testat lokalt:
+Projektet publiceras automatiskt på GitHub Pages när ändringar skickas till `main`.
+Aktivera GitHub Actions som publiceringskälla under repots **Settings → Pages**.
+Efter att arbetsflödet har körts finns appen på:
 
-```bash
-git init
-git add .
-git commit -m "Första versionen av Talutmaning"
-git branch -M main
-```
+https://goliat7111.github.io/Talutmaning/
