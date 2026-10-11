@@ -72,6 +72,7 @@ export default function App(){
   const [level,setLevel]=useState(1), [allowNegative,setAllowNegative]=useState(false);
   const [status,setStatus]=useState("idle"), [solutions,setSolutions]=useState([]), [showSolutions,setShowSolutions]=useState(false);
   const [viewMode,setViewMode]=useState("one"), [solutionIndex,setSolutionIndex]=useState(0), [displayMode,setDisplayMode]=useState("start");
+  const [gameSolutionOpen,setGameSolutionOpen]=useState(false);
   const [isFullscreen,setIsFullscreen]=useState(false), [fullscreenError,setFullscreenError]=useState("");
   const screenRef=useRef(null);
   useEffect(()=>{
@@ -89,6 +90,10 @@ export default function App(){
   const levelText={1:"Heltal, inga parenteser",2:"Heltal, parenteser tillåtna (inte inuti varandra)",3:"Bråktal och parenteser tillåtna (inte inuti varandra)"};
   const visible=viewMode==="five"?solutions.slice(0,5):solutions.length?[solutions[solutionIndex]]:[];
   const validation=!allNumbersValid?"Fyll i fem heltal från 1 till 9.":!numbersAreUnique?"De fem talen måste vara olika.":!validTarget?"Ange ett icke-negativt heltal som måltal.":"";
+  const toggleGameSolution=()=>{
+    if(!gameSolutionOpen&&status==="idle")check();
+    setGameSolutionOpen(open=>!open);
+  };
   const toggleFullscreen=async()=>{
     setFullscreenError("");
     try{
@@ -102,7 +107,8 @@ export default function App(){
 
   if(displayMode==="game") return <main ref={screenRef} className="game-screen">
     <div className="game-actions">
-      <button className="mode-button" onClick={()=>setDisplayMode("start")}><Eye/>Startvisning</button>
+      <button className="mode-button" onClick={()=>{setGameSolutionOpen(false);setDisplayMode("start")}}><Eye/>Startvisning</button>
+      <button className="mode-button" onClick={toggleGameSolution}><Lightbulb/>{gameSolutionOpen?"Dölj lösning":"Visa lösning"}</button>
       <button className="mode-button fullscreen-button" onClick={toggleFullscreen}>{isFullscreen?<Minimize/>:<Maximize/>}{isFullscreen?"Avsluta helskärm":"Helskärm"}</button>
     </div>
     {fullscreenError&&<p className="fullscreen-error" role="alert">{fullscreenError}</p>}
@@ -110,6 +116,15 @@ export default function App(){
       <h1>Talutmaning</h1>
       <div className="game-numbers">{numbers.map((v,i)=><div key={i}>{v}</div>)}</div>
       <div className="game-target"><span>Måltal</span><strong>{target}</strong></div>
+      {gameSolutionOpen&&<div className="game-solution">
+        {status==="searching"&&<p>Söker lösning...</p>}
+        {status==="none"&&<p>Ingen lösning hittades med de valda reglerna.</p>}
+        {status==="found"&&<>
+          <small>Lösning {solutionIndex+1} av {solutions.length}</small>
+          <strong>{solutions[solutionIndex].expression} = {show(solutions[solutionIndex].value)}</strong>
+          {solutions.length>1&&<div className="pager"><button onClick={()=>setSolutionIndex(i=>(i-1+solutions.length)%solutions.length)}><ChevronLeft/>Föregående</button><button onClick={()=>setSolutionIndex(i=>(i+1)%solutions.length)}>Nästa<ChevronRight/></button></div>}
+        </>}
+      </div>}
     </section>
   </main>;
 
