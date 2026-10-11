@@ -22,17 +22,42 @@ function evaluateLevel1(numbers,operators,allowNegative){
   for(let i=0;i<lowOps.length;i++){ result=lowOps[i]==="+"?add(result,lows[i+1]):sub(result,lows[i+1]); if(!result||result.d!==1||(!allowNegative&&result.n<0))return null; }
   return result;
 }
+function level1Tree(numbers,operators){
+  let current={v:numbers[0]}, total=null, pending=null;
+  for(let i=0;i<operators.length;i++){
+    const op=operators[i], next={v:numbers[i+1]};
+    if(op==="×"||op==="÷") current={op,l:current,r:next};
+    else { total=pending?{op:pending,l:total,r:current}:current; pending=op; current=next; }
+  }
+  return pending?{op:pending,l:total,r:current}:current;
+}
+const PRECEDENCE={"+":1,"−":1,"×":2,"÷":2};
+const hasFraction=n=>n.v===undefined&&(n.op==="÷"||hasFraction(n.l)||hasFraction(n.r));
+function Expr({node,inFraction=false}){
+  if(node.v!==undefined) return <>{node.v}</>;
+  if(node.op==="÷") return <span className={`frac${hasFraction(node.l)||hasFraction(node.r)?" frac-main":""}`}><span className="frac-top"><Expr node={node.l} inFraction/></span><span className="frac-bottom"><Expr node={node.r} inFraction/></span></span>;
+  const wrapChild=(child,isRight)=>{
+    if(inFraction||child.v!==undefined||child.op==="÷") return false;
+    const p=PRECEDENCE[child.op], parent=PRECEDENCE[node.op];
+    return p<parent||(isRight&&p===parent&&node.op==="−");
+  };
+  const part=(child,isRight)=>wrapChild(child,isRight)?<>({<Expr node={child}/>})</>:<Expr node={child} inFraction={inFraction}/>;
+  return <>{part(node.l,false)} {node.op} {part(node.r,true)}</>;
+}
+function Value({value}){
+  return value.d===1?<>{value.n}</>:<span className="frac"><span className="frac-top">{value.n}</span><span className="frac-bottom">{value.d}</span></span>;
+}
 function solveLevel1(numbers,target,allowNegative,limit=50){
   const solutions=[],seen=new Set();
   for(const ordered of permutations(numbers)) for(let code=0;code<256;code++){
     let x=code; const operators=[]; for(let i=0;i<4;i++){operators.push(OPS[x%4]);x=Math.floor(x/4)}
     const value=evaluateLevel1(ordered,operators,allowNegative);
-    if(value?.d===1&&value.n===target){ const expression=ordered.map((n,i)=>i?`${operators[i-1]} ${n}`:`${n}`).join(" "); if(!seen.has(expression)){seen.add(expression);solutions.push({expression,value});if(solutions.length>=limit)return solutions;} }
+    if(value?.d===1&&value.n===target){ const expression=ordered.map((n,i)=>i?`${operators[i-1]} ${n}`:`${n}`).join(" "); if(!seen.has(expression)){seen.add(expression);solutions.push({expression,value,node:level1Tree(ordered,operators)});if(solutions.length>=limit)return solutions;} }
   }
   return solutions;
 }
 function solveTree(numbers,target,level,allowNegative,limit=50){
-  const targetValue=frac(target), initial=numbers.map((n,i)=>({value:frac(n),expression:`${n}`,used:1<<i,prec:3,nest:0}));
+  const targetValue=frac(target), initial=numbers.map((n,i)=>({value:frac(n),expression:`${n}`,node:{v:n},used:1<<i,prec:3,nest:0}));
   const solutions=[],seen=new Set(),visits=new Map();
   const PREC={"+":1,"−":1,"×":2,"÷":2};
   // Parenteser sätts bara där de behövs och får aldrig ligga inuti andra parenteser.
@@ -45,7 +70,7 @@ function solveTree(numbers,target,level,allowNegative,limit=50){
   const combine=(x,y,op,value)=>{
     const left=operand(x,op,false), right=operand(y,op,true);
     if(!left||!right)return null;
-    return {value,expression:`${left.text} ${op} ${right.text}`,used:x.used|y.used,prec:PREC[op],nest:Math.max(left.nest,right.nest)};
+    return {value,expression:`${left.text} ${op} ${right.text}`,node:{op,l:x.node,r:y.node},used:x.used|y.used,prec:PREC[op],nest:Math.max(left.nest,right.nest)};
   };
   const search=items=>{
     if(solutions.length>=limit)return;
@@ -65,6 +90,7 @@ function solveTree(numbers,target,level,allowNegative,limit=50){
   };
   search(initial); return solutions;
 }
+const shuffle=list=>{const a=[...list];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
 const solve=(numbers,target,level,allowNegative)=>level===1?solveLevel1(numbers,target,allowNegative):solveTree(numbers,target,level,allowNegative);
 
 export default function App(){
@@ -85,7 +111,7 @@ export default function App(){
   const validTarget=target!==""&&Number.isInteger(Number(target))&&Number(target)>=0, valid=allNumbersValid&&numbersAreUnique&&validTarget;
   const clear=()=>{setStatus("idle");setSolutions([]);setShowSolutions(false);setViewMode("one");setSolutionIndex(0)};
   const randomize=()=>{const unique=new Set();while(unique.size<5)unique.add(Math.floor(Math.random()*9)+1);setNumbers([...unique].map(String));clear()};
-  const check=()=>{if(!valid)return;setStatus("searching");setShowSolutions(false);setTimeout(()=>{const found=solve(parsed,Number(target),level,allowNegative);setSolutions(found);setStatus(found.length?"found":"none")},50)};
+  const check=()=>{if(!valid)return;setStatus("searching");setShowSolutions(false);setTimeout(()=>{const found=shuffle(solve(parsed,Number(target),level,allowNegative));setSolutions(found);setSolutionIndex(0);setStatus(found.length?"found":"none")},50)};
   const reset=()=>{setNumbers(["","","","",""]);setTarget("");setLevel(1);setAllowNegative(false);setDisplayMode("start");clear()};
   const levelText={1:"Heltal, inga parenteser",2:"Heltal, parenteser tillåtna (inte inuti varandra)",3:"Bråktal och parenteser tillåtna (inte inuti varandra)"};
   const visible=viewMode==="five"?solutions.slice(0,5):solutions.length?[solutions[solutionIndex]]:[];
@@ -107,9 +133,9 @@ export default function App(){
 
   if(displayMode==="game") return <main ref={screenRef} className="game-screen">
     <div className="game-actions">
-      <button className="mode-button" onClick={()=>{setGameSolutionOpen(false);setDisplayMode("start")}}><Eye/>Startvisning</button>
-      <button className="mode-button" onClick={toggleGameSolution}><Lightbulb/>{gameSolutionOpen?"Dölj lösning":"Visa lösning"}</button>
-      <button className="mode-button fullscreen-button" onClick={toggleFullscreen}>{isFullscreen?<Minimize/>:<Maximize/>}{isFullscreen?"Avsluta helskärm":"Helskärm"}</button>
+      <button className="mode-button icon-button" title="Startvisning" aria-label="Startvisning" onClick={()=>{setGameSolutionOpen(false);setDisplayMode("start")}}><Eye/></button>
+      <button className="mode-button icon-button" title={gameSolutionOpen?"Dölj lösning":"Visa lösning"} aria-label={gameSolutionOpen?"Dölj lösning":"Visa lösning"} onClick={toggleGameSolution}><Lightbulb/></button>
+      <button className="mode-button icon-button fullscreen-button" title={isFullscreen?"Avsluta helskärm":"Helskärm"} aria-label={isFullscreen?"Avsluta helskärm":"Helskärm"} onClick={toggleFullscreen}>{isFullscreen?<Minimize/>:<Maximize/>}</button>
     </div>
     {fullscreenError&&<p className="fullscreen-error" role="alert">{fullscreenError}</p>}
     <section className="game-content">
@@ -121,8 +147,8 @@ export default function App(){
         {status==="none"&&<p>Ingen lösning hittades med de valda reglerna.</p>}
         {status==="found"&&<>
           <small>Lösning {solutionIndex+1} av {solutions.length}</small>
-          <strong>{solutions[solutionIndex].expression} = {show(solutions[solutionIndex].value)}</strong>
-          {solutions.length>1&&<div className="pager"><button onClick={()=>setSolutionIndex(i=>(i-1+solutions.length)%solutions.length)}><ChevronLeft/>Föregående</button><button onClick={()=>setSolutionIndex(i=>(i+1)%solutions.length)}>Nästa<ChevronRight/></button></div>}
+          <strong><Expr node={solutions[solutionIndex].node}/> = <Value value={solutions[solutionIndex].value}/></strong>
+          {solutions.length>1&&<div className="pager"><button title="Föregående" aria-label="Föregående" onClick={()=>setSolutionIndex(i=>(i-1+solutions.length)%solutions.length)}><ChevronLeft/></button><button title="Nästa" aria-label="Nästa" onClick={()=>setSolutionIndex(i=>(i+1)%solutions.length)}><ChevronRight/></button></div>}
         </>}
       </div>}
     </section>
@@ -141,6 +167,6 @@ export default function App(){
       <button className="search" disabled={!valid||status==="searching"} onClick={check}><Search/>{status==="searching"?"Söker...":"Kontrollera om en lösning finns"}</button>
     </section>
     <aside><section className="rules"><h2><ShieldCheck/>Aktuella regler</h2><ul><li>De fem talen är unika och används exakt en gång.</li><li>De fyra räknesätten får användas.</li><li>{levelText[level]}.</li><li>Negativa delresultat är {allowNegative?"tillåtna":"inte tillåtna"}.</li><li>Division med noll är aldrig tillåten.</li></ul></section>
-    <section className={`results ${status}`}><h2><Lightbulb/>Resultat</h2>{status==="idle"&&<p>Fyll i talen och sök efter lösningar.</p>}{status==="searching"&&<p>Söker systematiskt...</p>}{status==="none"&&<p>Ingen lösning hittades med de valda reglerna.</p>}{status==="found"&&<><b>{solutions.length>=50?"Minst 50 lösningar hittades.":`${solutions.length} lösningar hittades.`}</b><button className="solution-toggle" onClick={()=>setShowSolutions(v=>!v)}><Eye/>{showSolutions?"Dölj lösningar":"Visa lösningar"}</button>{showSolutions&&<><div className="view-buttons"><button onClick={()=>setViewMode("one")}><Eye/>En i taget</button><button onClick={()=>setViewMode("five")}><List/>Visa fem</button></div>{visible.map((s,i)=><div className="solution" key={s.expression+i}><small>{viewMode==="one"?`Lösning ${solutionIndex+1} av ${solutions.length}`:`Lösning ${i+1}`}</small><strong>{s.expression}</strong><b>= {show(s.value)}</b></div>)}{viewMode==="one"&&solutions.length>1&&<div className="pager"><button onClick={()=>setSolutionIndex(i=>(i-1+solutions.length)%solutions.length)}><ChevronLeft/>Föregående</button><button onClick={()=>setSolutionIndex(i=>(i+1)%solutions.length)}>Nästa<ChevronRight/></button></div>}</>}</>}</section></aside></div>
+    <section className={`results ${status}`}><h2><Lightbulb/>Resultat</h2>{status==="idle"&&<p>Fyll i talen och sök efter lösningar.</p>}{status==="searching"&&<p>Söker systematiskt...</p>}{status==="none"&&<p>Ingen lösning hittades med de valda reglerna.</p>}{status==="found"&&<><b>{solutions.length>=50?"Minst 50 lösningar hittades.":`${solutions.length} lösningar hittades.`}</b><button className="solution-toggle" onClick={()=>setShowSolutions(v=>!v)}><Eye/>{showSolutions?"Dölj lösningar":"Visa lösningar"}</button>{showSolutions&&<><div className="view-buttons"><button onClick={()=>setViewMode("one")}><Eye/>En i taget</button><button onClick={()=>setViewMode("five")}><List/>Visa fem</button></div>{visible.map((s,i)=><div className="solution" key={s.expression+i}><small>{viewMode==="one"?`Lösning ${solutionIndex+1} av ${solutions.length}`:`Lösning ${i+1}`}</small><div className="solution-line"><strong><Expr node={s.node}/></strong><b>= <Value value={s.value}/></b></div></div>)}{viewMode==="one"&&solutions.length>1&&<div className="pager"><button onClick={()=>setSolutionIndex(i=>(i-1+solutions.length)%solutions.length)}><ChevronLeft/>Föregående</button><button onClick={()=>setSolutionIndex(i=>(i+1)%solutions.length)}>Nästa<ChevronRight/></button></div>}</>}</>}</section></aside></div>
   </div></main>;
 }

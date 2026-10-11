@@ -10,5 +10,17 @@
 .game-solution .pager{max-width:420px;margin:16px auto 0}
 .game-solution .pager button{padding:10px;border-radius:10px;border:1px solid #6ee7b7;background:white;display:flex;justify-content:center;gap:5px}
 .game-actions{flex-wrap:wrap;justify-content:flex-end}
+.game-actions .icon-button{padding:8px;border-radius:10px;justify-content:center}
+.game-actions .icon-button svg{width:18px;height:18px}
+.game-solution .pager{max-width:160px;margin:16px auto 0}
+.game-solution .pager button{padding:6px;border-radius:8px}
+.game-solution .pager svg{width:18px;height:18px}
+.frac{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;text-align:center;line-height:1.15;margin:0 .15em}
+.frac-top{padding:0 .25em;border-bottom:.08em solid currentColor}
+.frac-bottom{padding:0 .25em}
+.solution>.solution-line{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.solution-line b{white-space:nowrap;margin-left:auto}
+.frac-main>.frac-top{border-bottom-width:.2em;padding-bottom:.2em}
+.frac-main>.frac-bottom{padding-top:.2em}
 .fullscreen-error{color:#fecaca;background:#7f1d1d;padding:10px 14px;border-radius:10px}
 @media(max-width:420px){.game-actions{top:14px;right:14px;gap:6px}.game-actions .mode-button{padding:9px 10px;font-size:.85rem}}
