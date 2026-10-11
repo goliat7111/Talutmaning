@@ -32,22 +32,35 @@ function solveLevel1(numbers,target,allowNegative,limit=50){
   return solutions;
 }
 function solveTree(numbers,target,level,allowNegative,limit=50){
-  const targetValue=frac(target), initial=numbers.map((n,i)=>({value:frac(n),expression:`${n}`,used:1<<i}));
+  const targetValue=frac(target), initial=numbers.map((n,i)=>({value:frac(n),expression:`${n}`,used:1<<i,prec:3,nest:0}));
   const solutions=[],seen=new Set(),visits=new Map();
+  const PREC={"+":1,"−":1,"×":2,"÷":2};
+  // Parenteser sätts bara där de behövs och får aldrig ligga inuti andra parenteser.
+  const operand=(item,op,isRight)=>{
+    const needsParens=item.prec<PREC[op]||(isRight&&item.prec===PREC[op]&&(op==="−"||op==="÷"));
+    if(!needsParens)return {text:item.expression,nest:item.nest};
+    if(item.nest>=1)return null;
+    return {text:`(${item.expression})`,nest:item.nest+1};
+  };
+  const combine=(x,y,op,value)=>{
+    const left=operand(x,op,false), right=operand(y,op,true);
+    if(!left||!right)return null;
+    return {value,expression:`${left.text} ${op} ${right.text}`,used:x.used|y.used,prec:PREC[op],nest:Math.max(left.nest,right.nest)};
+  };
   const search=items=>{
     if(solutions.length>=limit)return;
     if(items.length===1){const item=items[0];if(eq(item.value,targetValue)&&!seen.has(item.expression)){seen.add(item.expression);solutions.push(item)}return;}
-    const signature=items.map(x=>`${x.used}:${fkey(x.value)}`).sort().join("|"); const count=visits.get(signature)||0; if(count>=3)return; visits.set(signature,count+1);
+    const signature=items.map(x=>`${x.used}:${fkey(x.value)}:${x.prec}:${x.nest}`).sort().join("|"); const count=visits.get(signature)||0; if(count>=3)return; visits.set(signature,count+1);
     for(let i=0;i<items.length;i++)for(let j=i+1;j<items.length;j++){
       const a=items[i],b=items[j]; const candidates=[
-        {value:add(a.value,b.value),expression:`${wrap(a.expression)} + ${wrap(b.expression)}`},
-        {value:mul(a.value,b.value),expression:`${wrap(a.expression)} × ${wrap(b.expression)}`},
-        {value:sub(a.value,b.value),expression:`${wrap(a.expression)} − ${wrap(b.expression)}`},
-        {value:sub(b.value,a.value),expression:`${wrap(b.expression)} − ${wrap(a.expression)}`},
-        {value:div(a.value,b.value),expression:`${wrap(a.expression)} ÷ ${wrap(b.expression)}`},
-        {value:div(b.value,a.value),expression:`${wrap(b.expression)} ÷ ${wrap(a.expression)}`}
+        [a,b,"+",add(a.value,b.value)],
+        [a,b,"×",mul(a.value,b.value)],
+        [a,b,"−",sub(a.value,b.value)],
+        [b,a,"−",sub(b.value,a.value)],
+        [a,b,"÷",div(a.value,b.value)],
+        [b,a,"÷",div(b.value,a.value)]
       ];
-      for(const c of candidates){ if(!c.value||(level===2&&c.value.d!==1)||(!allowNegative&&c.value.n<0))continue; const next=items.filter((_,k)=>k!==i&&k!==j); next.push({value:c.value,expression:c.expression,used:a.used|b.used}); search(next); if(solutions.length>=limit)return; }
+      for(const [x,y,op,value] of candidates){ if(!value||(level===2&&value.d!==1)||(!allowNegative&&value.n<0))continue; const merged=combine(x,y,op,value); if(!merged)continue; const next=items.filter((_,k)=>k!==i&&k!==j); next.push(merged); search(next); if(solutions.length>=limit)return; }
     }
   };
   search(initial); return solutions;
@@ -73,7 +86,7 @@ export default function App(){
   const randomize=()=>{const unique=new Set();while(unique.size<5)unique.add(Math.floor(Math.random()*9)+1);setNumbers([...unique].map(String));clear()};
   const check=()=>{if(!valid)return;setStatus("searching");setShowSolutions(false);setTimeout(()=>{const found=solve(parsed,Number(target),level,allowNegative);setSolutions(found);setStatus(found.length?"found":"none")},50)};
   const reset=()=>{setNumbers(["","","","",""]);setTarget("");setLevel(1);setAllowNegative(false);setDisplayMode("start");clear()};
-  const levelText={1:"Heltal, inga parenteser",2:"Heltal, parenteser tillåtna",3:"Bråktal och parenteser tillåtna"};
+  const levelText={1:"Heltal, inga parenteser",2:"Heltal, parenteser tillåtna (inte inuti varandra)",3:"Bråktal och parenteser tillåtna (inte inuti varandra)"};
   const visible=viewMode==="five"?solutions.slice(0,5):solutions.length?[solutions[solutionIndex]]:[];
   const validation=!allNumbersValid?"Fyll i fem heltal från 1 till 9.":!numbersAreUnique?"De fem talen måste vara olika.":!validTarget?"Ange ett icke-negativt heltal som måltal.":"";
   const toggleFullscreen=async()=>{
